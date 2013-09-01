@@ -1,14 +1,6 @@
-# AWS Plugin for CakePHP 1.3+
-
-CakePHP plugin containing datasources & models to facilitate interacting with Amazon Web Services.
+cakePHP plugin for S3 bucket obbject management
 
 For now, this plugin only provides basic S3 functionality. It is my hope that over time, more advanced S3 functionality will be included, in addition to support for interacting with other popular AWS services, including EC2, RD2, SQS, SES, CloudFront, and more.
-
-## Installation
-
-1. Extract the downloaded archive from [here](http://github.com/anthonyp/CakePHP-AWS-Plugin/zipball/master)
-2. Move or copy the extracted directory anthonyp-CakePHP-AWS-Plugin-[hash] to /path/to/your/app/plugins/aws
-3. Copy the AWS setting stubs from the plugin's config/core.php into your app's config/core.php and modify to suit
 
 Instructions / Currently Supported Functionality
 ================================================
