@@ -2,8 +2,8 @@ cakePHP plugin for S3 bucket obbject management
 
 For now, this plugin only provides basic S3 functionality. It is my hope that over time, more advanced S3 functionality will be included, in addition to support for interacting with other popular AWS services, including EC2, RD2, SQS, SES, CloudFront, and more.
 
-Instructions / Currently Supported Functionality
-================================================
+Functionality
+=============
 
 ### S3
 
