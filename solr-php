@@ -1,0 +1,176 @@
+Integrating Solr based Search in PHP applications
+==================================================
+
+So why do you need a search engine, is database not enough? If you create a small website it might not matter. With medium or big size applications it’s often wiser to go for a search engine. Saying that, even a small websites can benefit from Solr if you desire a high level of relevance in search results.
+
+Let’s imagine you have to create a search handler for an e-commerce website. A naive approach would be creating database query like this:
+SELECT * FROM PRODUCTS WHERE LOWER(title) like LOWER('%$phrase%') OR LOWER(description) like LOWER('%$phrase%');
+	
+SELECT * FROM PRODUCTS
+WHERE LOWER(title) like LOWER('%$phrase%')
+OR LOWER(description) like LOWER('%$phrase%');
+
+It might work if the search phrase is exactly as part of a title or a description. In the real life items have complex names, for instance: Apple iPhone 4G black 16GB. If somebody looks for “iPhone 16GB” no results will be returned. You can mitigate it by replacing white spaces with “%” character before the phrase is passed to SQL.
+$phrase = str_replace(' ', '%', $phrase);
+	
+$phrase = str_replace(' ', '%', $phrase);
+
+It will work for the above problem but what if the phrase is “iPhone 16GB 4G”? Obviously different order of keywords won’t work with the above system. I presume you can have an additional column and order words alphabetically, but what about misspells or synonyms? Coming up with a good solution for search system is a challenging task.
+
+Producing a clever algorithm is not the only problem. Text search is resource consuming exercise. Laying too much stress on a database is never a good idea. The ultimate reason for that is databases don’t scale well. You can’t just add another instance as you would do for a web server or Memcached. Scaling database requires preparation, changes in software, configuration, down time and generally speaking is expensive. The good news is both problems can be solved with Solr.
+
+Solr is an enterprise search platform based on Apache Lucene. It’s fast, stable, has good document and scales very well. While Solr is a robust solution and listing all features it provides is light years beyond scope of this post, it’s relatively easy to start using it.
+
+First, download the latest version of the Service from the official site. Solr is written in Java so you also need Java Runtime Environment to run it.
+$ cd solr-4.1.0/example/ $ java -jar start.jar
+	
+$ cd solr-4.1.0/example/
+$ java -jar start.jar
+
+After few seconds you should see something like
+2013-03-09 18:47:41.177:INFO:oejs.AbstractConnector:Started SocketConnector@0.0.0.0:8983
+	
+2013-03-09 18:47:41.177:INFO:oejs.AbstractConnector:Started SocketConnector@0.0.0.0:8983
+
+Solr has a web interface which is available under port 8983. Open a web browser and go to http://localhost:8983/solr/.
+
+If you look at the left hand side navigation you will find “collection1″. Collections in Solr are something similar to database table. You can query it. Click on the collection and chose “query” from submenu.
+
+First option is called “Request-Handler (qt)” with default value “/select”. Request handlers are sort of pre-defined queries. If you look into Solr config file you can find all of them.
+$ vim solr-4.1.0/example/solr/collection1/conf/solrconfig.xml
+
+	
+$ vim solr-4.1.0/example/solr/collection1/conf/solrconfig.xml
+
+<requestHandler name="/select" class="solr.SearchHandler"> <lst name="defaults"> <str name="echoParams">explicit</str> <int name="rows">10</int> <str name="df">text</str> </lst> </requestHandler>
+	
+<requestHandler name="/select" class="solr.SearchHandler">
+    <lst name="defaults">
+        <str name="echoParams">explicit</str>
+       <int name="rows">10</int>
+       <str name="df">text</str>
+    </lst>
+</requestHandler>
+
+Second and the most interesting parameter is query. Default value “*:*” selects everything. If you click on “execute query” you should get something like this:
+<?xml version="1.0" encoding="UTF-8"?> <response> <lst name="responseHeader"> <int name="status">0</int> <int name="QTime">1</int> <lst name="params"> <str name="indent">true</str> <str name="q">*:*</str> <str name="wt">xml</str> </lst> </lst> <result name="response" numFound="0" start="0" /> </response>
+	
+<?xml version="1.0" encoding="UTF-8"?>
+<response>
+    <lst name="responseHeader">
+        <int name="status">0</int>
+        <int name="QTime">1</int>
+        <lst name="params">
+        <str name="indent">true</str>
+        <str name="q">*:*</str>
+        <str name="wt">xml</str>
+        </lst>
+    </lst>
+    <result name="response" numFound="0" start="0" />
+</response>
+
+The index is empty but It’s not a problem. You can quickly insert some example data.
+$ cd solr-4.1.0/example/exampledocs/ $ java -jar post.jar monitor.xml SimplePostTool version 1.5 Posting files to base url http://localhost:8983/solr/update using content-type application/xml.. POSTing file monitor.xml 1 files indexed. COMMITting Solr index changes to http://localhost:8983/solr/update..
+	
+$ cd solr-4.1.0/example/exampledocs/
+$ java -jar post.jar monitor.xml
+ 
+SimplePostTool version 1.5
+Posting files to base url http://localhost:8983/solr/update using content-type application/xml..
+POSTing file monitor.xml
+1 files indexed.
+COMMITting Solr index changes to http://localhost:8983/solr/update..
+
+Now you can go back to query interface. This time one document should be returned.
+
+Collection’s data structure is defined in schema file.
+$ vim solr-4.1.0/example/solr/collection1/conf/schema.xml
+
+	
+$ vim solr-4.1.0/example/solr/collection1/conf/schema.xml
+
+The file is has very good comments and you can easy figure out what’s going on there. If you want to amend the schema don’t remove filed named “text” (without a good reason). It’s used by other fields and some request handlers are referring to it (including select, look above).
+$ grep text solr-4.1.0/example/solr/collection1/conf/schema.xml | grep copy <copyField source="cat" dest="text"/> <copyField source="name" dest="text"/> <copyField source="manu" dest="text"/> <copyField source="features" dest="text"/> <copyField source="includes" dest="text"/> <copyField source="title" dest="text"/> <copyField source="author" dest="text"/> <copyField source="description" dest="text"/> <copyField source="keywords" dest="text"/> <copyField source="content" dest="text"/> <copyField source="content_type" dest="text"/> <copyField source="resourcename" dest="text"/> <copyField source="url" dest="text"/>
+	
+$ grep text solr-4.1.0/example/solr/collection1/conf/schema.xml | grep copy
+ 
+<copyField source="cat" dest="text"/>
+<copyField source="name" dest="text"/>
+<copyField source="manu" dest="text"/>
+<copyField source="features" dest="text"/>
+<copyField source="includes" dest="text"/>
+<copyField source="title" dest="text"/>
+<copyField source="author" dest="text"/>
+<copyField source="description" dest="text"/>
+<copyField source="keywords" dest="text"/>
+<copyField source="content" dest="text"/>
+<copyField source="content_type" dest="text"/>
+<copyField source="resourcename" dest="text"/>
+<copyField source="url" dest="text"/>
+
+If you use relational database you don’t want to duplicate data. Solr is not a database. Many fields are copied to the text field. Default request handler will look there on search.
+
+To access Solr from PHP you need a client. I can recommend the one available on PECL. It’s fast, have clear API and is well document. There is one issue with the current version (1.0.2) of the extension. It doesn’t work with Solr4.x ;) . There is a small difference in protocol between 3.x and 4.x. Don’t worry, I’ve fix this issue and you can download working version from here https://github.com/lukaszkujawa/php-pecl-solr. I’ve been using this fix for a while now and it feels stable. It introduces small change to SolrClient constructor – additional parameter to specify version. The patch will go to the official release so you won’t lose consistence.
+$ git clone https://github.com/lukaszkujawa/php-pecl-solr.git $ cd php-pecl-solr/ $ phpize $ whereis php-config php-config: /usr/bin/php-config /usr/bin/X11/php-config $ ./configure --with-php-config=/usr/bin/php-config $ make $ make install
+	
+$ git clone https://github.com/lukaszkujawa/php-pecl-solr.git
+$ cd php-pecl-solr/
+$ phpize
+$ whereis php-config
+php-config: /usr/bin/php-config /usr/bin/X11/php-config
+$ ./configure --with-php-config=/usr/bin/php-config
+$ make
+$ make install
+
+Edit your php.ini and add
+extension=solr.so
+	
+extension=solr.so
+
+Restart web server.
+$ /etc/init.d/apache2 restart
+	
+$ /etc/init.d/apache2 restart
+
+Now we can create a PHP script which will insert something into the index.
+<?php $options = array ( 'hostname' => '127.0.0.1', ); $client = new SolrClient($options, "4.0"); // use 4.0 for any version of Solr 4.x, ignore this parameter for previous versions $doc = new SolrInputDocument(); $doc->addField('id', 100); $doc->addField('title', 'Hello Wolrd'); $doc->addField('description', 'Example Document'); $doc->addField('cat', 'Foo'); $doc->addField('cat', 'Bar'); $response = $client->addDocument($doc); $client->commit(); /* ------------------------------- */ $query = new SolrQuery(); $query->setQuery('hello'); $query->addField('id') ->addField('title') ->addField('description') ->addField('cat'); $queryResponse = $client->query($query); $response = $queryResponse->getResponse(); print_r( $response->response->docs );
+	
+<?php
+ 
+$options = array (
+    'hostname' => '127.0.0.1',
+);
+ 
+$client = new SolrClient($options, "4.0"); // use 4.0 for any version of Solr 4.x, ignore this parameter for previous versions
+ 
+$doc = new SolrInputDocument();
+ 
+$doc->addField('id', 100);
+$doc->addField('title', 'Hello Wolrd');
+$doc->addField('description', 'Example Document');
+$doc->addField('cat', 'Foo');
+$doc->addField('cat', 'Bar');
+ 
+$response = $client->addDocument($doc);
+ 
+$client->commit();
+ 
+/* ------------------------------- */
+ 
+$query = new SolrQuery();
+ 
+$query->setQuery('hello');
+ 
+$query->addField('id')
+->addField('title')
+->addField('description')
+->addField('cat');
+ 
+$queryResponse = $client->query($query);
+ 
+$response = $queryResponse->getResponse();
+ 
+print_r( $response->response->docs );
+
+If you insert more then one document commit at the end. 
+It’s resource consuming process and you don’t want commits to clobber. 
